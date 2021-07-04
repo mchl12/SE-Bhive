@@ -1,0 +1,30 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31129.286
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bot", "Bot.csproj", "{9506C9B4-5AAF-44D5-BB9D-7AF54AFB2A23}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Test", "..\Test\Test.csproj", "{9258D2A3-0AE3-4708-A262-43DF52203F2C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AntennaTether", "..\AntennaTether\AntennaTether.csproj", "{B7406437-0CD6-4CD6-B3AE-09FF2E336D36}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9506C9B4-5AAF-44D5-BB9D-7AF54AFB2A23}.Debug|x64.ActiveCfg = Debug|x64
+		{9506C9B4-5AAF-44D5-BB9D-7AF54AFB2A23}.Debug|x64.Build.0 = Debug|x64
+		{9258D2A3-0AE3-4708-A262-43DF52203F2C}.Debug|x64.ActiveCfg = Debug|x64
+		{9258D2A3-0AE3-4708-A262-43DF52203F2C}.Debug|x64.Build.0 = Debug|x64
+		{B7406437-0CD6-4CD6-B3AE-09FF2E336D36}.Debug|x64.ActiveCfg = Debug|x64
+		{B7406437-0CD6-4CD6-B3AE-09FF2E336D36}.Debug|x64.Build.0 = Debug|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {B3161AF6-3FEA-40FF-B879-4F51FC82CBD7}
+	EndGlobalSection
+EndGlobal
