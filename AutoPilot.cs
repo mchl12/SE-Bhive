@@ -49,7 +49,7 @@ namespace IngameScript
                 program.GridTerminalSystem.GetBlocksOfType(thrusters); // get thrusters
             }
 
-            public AutoPilot GetInstance(Program program)
+            public static AutoPilot GetInstance(Program program)
             {
                 if (instance == null)
                     instance = new AutoPilot(program);
@@ -115,12 +115,32 @@ namespace IngameScript
                 {
                     try
                     {
-                        if (!thrusters[i].IsWorking)
+                        if (!thrusters[i].IsWorking) // thruster must work
                             continue;
 
-                        Vector3D thrustDir = thrusters[i].GridThrustDirection;
+                        Vector3I thrustDir = thrusters[i].GridThrustDirection;
 
-                        
+                        if (gridTargetForce.Dot((Vector3D)thrustDir) <= 0) // thruster won't help
+                            continue;
+
+                        if (thrustDir.X != 0)
+                        {
+                            double thrustAmount = Math.Min(Math.Abs(gridTargetForce.X), thrusters[i].MaxEffectiveThrust); // either what the thruster can do, or as much as is required
+                            gridTargetForce.X -= thrustAmount * Math.Sign(thrustDir.X); // change the target force
+                            thrusters[i].ThrustOverridePercentage = (float)(thrustAmount / thrusters[i].MaxEffectiveThrust); // set the thrust
+                        }
+                        else if (thrustDir.Y != 0)
+                        {
+                            double thrustAmount = Math.Min(Math.Abs(gridTargetForce.Y), thrusters[i].MaxEffectiveThrust); // either what the thruster can do, or as much as is required
+                            gridTargetForce.Y -= thrustAmount * Math.Sign(thrustDir.Y); // change the target force
+                            thrusters[i].ThrustOverridePercentage = (float)(thrustAmount / thrusters[i].MaxEffectiveThrust); // set the thrust
+                        }
+                        else if (thrustDir.Z != 0)
+                        {
+                            double thrustAmount = Math.Min(Math.Abs(gridTargetForce.Z), thrusters[i].MaxEffectiveThrust); // either what the thruster can do, or as much as is required
+                            gridTargetForce.Z -= thrustAmount * Math.Sign(thrustDir.Z); // change the target force
+                            thrusters[i].ThrustOverridePercentage = (float)(thrustAmount / thrusters[i].MaxEffectiveThrust); // set the thrust
+                        }
                     }
                     catch (NullReferenceException)
                     {

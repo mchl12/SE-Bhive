@@ -25,12 +25,15 @@ namespace IngameScript
     {
         private readonly IMyBroadcastListener locationListener;
 
+        private readonly AutoPilot autopilot;
         private Vector3D? target;
 
         public Program()
         {
             locationListener = IGC.RegisterBroadcastListener("location"); // initiaize broadcastlistener
             locationListener.SetMessageCallback();
+
+            autopilot = AutoPilot.GetInstance(this);
 
             Runtime.UpdateFrequency |= UpdateFrequency.Update10; // set update frequency
 
@@ -49,6 +52,8 @@ namespace IngameScript
 
             if ((updateSource & UpdateType.Update10) != 0)
             {
+                if (target.HasValue)
+                    autopilot.TrySetThrustersToTarget(target.Value);
             }
         }
 
