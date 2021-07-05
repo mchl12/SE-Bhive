@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Test", "..\Test\Test.csproj
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AntennaTether", "..\AntennaTether\AntennaTether.csproj", "{B7406437-0CD6-4CD6-B3AE-09FF2E336D36}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ThrustCalculator", "..\ThrustCalculator\ThrustCalculator.csproj", "{1B187CC0-9990-4279-A839-29938503D79A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -20,6 +22,8 @@ Global
 		{9258D2A3-0AE3-4708-A262-43DF52203F2C}.Debug|x64.Build.0 = Debug|x64
 		{B7406437-0CD6-4CD6-B3AE-09FF2E336D36}.Debug|x64.ActiveCfg = Debug|x64
 		{B7406437-0CD6-4CD6-B3AE-09FF2E336D36}.Debug|x64.Build.0 = Debug|x64
+		{1B187CC0-9990-4279-A839-29938503D79A}.Debug|x64.ActiveCfg = Debug|x64
+		{1B187CC0-9990-4279-A839-29938503D79A}.Debug|x64.Build.0 = Debug|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

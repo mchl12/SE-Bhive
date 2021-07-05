@@ -94,7 +94,7 @@ namespace IngameScript
                         v_desired = v_desired / v_desired.Length() * 100; // adjust to max speed
 
                     Vector3D a_desired = v_desired - shipController.GetShipVelocities().LinearVelocity;
-                    return a_desired * shipController.Mass;
+                    return a_desired * shipController.Mass * 60; // multiply by game ticks so we accelerate this amount in 1 tick
                 }
                 catch (NullReferenceException) // catch disappeared ship controller
                 {
@@ -105,12 +105,10 @@ namespace IngameScript
 
             /**
              * <summary>Sets the thrusters so they get as close as possible to the target force</summary>
-             * <param name="force">The desired force</param>
+             * <param name="force">The desired force of the ship</param>
              */
             private void SetThrustersToForce(Vector3D targetForce)
             {
-                Vector3D gridTargetForce = WorldDirectionToGrid(targetForce, program.Me.WorldMatrix);
-
                 for (int i = thrusters.Count - 1; i >= 0; i--)
                 {
                     try
@@ -118,29 +116,18 @@ namespace IngameScript
                         if (!thrusters[i].IsWorking) // thruster must work
                             continue;
 
-                        Vector3I thrustDir = thrusters[i].GridThrustDirection;
+                        Vector3D thrustDir = -thrusters[i].WorldMatrix.Forward;
+                        double dotProduct = thrustDir.Dot(targetForce);
 
-                        if (gridTargetForce.Dot((Vector3D)thrustDir) <= 0) // thruster won't help
+                        if (dotProduct <= 0) // thruster won't help
+                        {
+                            thrusters[i].ThrustOverridePercentage = 0f;
                             continue;
+                        }
 
-                        if (thrustDir.X != 0)
-                        {
-                            double thrustAmount = Math.Min(Math.Abs(gridTargetForce.X), thrusters[i].MaxEffectiveThrust); // either what the thruster can do, or as much as is required
-                            gridTargetForce.X -= thrustAmount * Math.Sign(thrustDir.X); // change the target force
-                            thrusters[i].ThrustOverridePercentage = (float)(thrustAmount / thrusters[i].MaxEffectiveThrust); // set the thrust
-                        }
-                        else if (thrustDir.Y != 0)
-                        {
-                            double thrustAmount = Math.Min(Math.Abs(gridTargetForce.Y), thrusters[i].MaxEffectiveThrust); // either what the thruster can do, or as much as is required
-                            gridTargetForce.Y -= thrustAmount * Math.Sign(thrustDir.Y); // change the target force
-                            thrusters[i].ThrustOverridePercentage = (float)(thrustAmount / thrusters[i].MaxEffectiveThrust); // set the thrust
-                        }
-                        else if (thrustDir.Z != 0)
-                        {
-                            double thrustAmount = Math.Min(Math.Abs(gridTargetForce.Z), thrusters[i].MaxEffectiveThrust); // either what the thruster can do, or as much as is required
-                            gridTargetForce.Z -= thrustAmount * Math.Sign(thrustDir.Z); // change the target force
-                            thrusters[i].ThrustOverridePercentage = (float)(thrustAmount / thrusters[i].MaxEffectiveThrust); // set the thrust
-                        }
+                        double thrustAmount = Math.Min(dotProduct, thrusters[i].MaxEffectiveThrust); // what the thruster can do or as much as is required
+                        targetForce -= thrustAmount * thrustDir; // update the target force
+                        thrusters[i].ThrustOverridePercentage = (float)(thrustAmount / thrusters[i].MaxEffectiveThrust); // set the thrust
                     }
                     catch (NullReferenceException)
                     {
