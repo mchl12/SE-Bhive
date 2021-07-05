@@ -22,33 +22,70 @@ namespace IngameScript
 {
     partial class Program
     {
+        /**
+         * <summary>AutoPilot offers functions for flying and maneuvering ships</summary>
+         */
         public class AutoPilot
         {
-            private static AutoPilot instance;
+            private static AutoPilot instance; // singleton pattern because there can only be one instance
 
-            public static Vector3D WorldDirectionToGrid(Vector3D v, MatrixD worldMatrix)
+            /**
+             * <summary>Converts a direction vector in the world grid to a direction vector in the local grid</summary>
+             * <param name="v">The vector to convert</param>
+             * <param name="worldMatrix">The world matrix to use for the conversion</param>
+             */
+            private static Vector3D WorldDirectionToGrid(Vector3D v, MatrixD worldMatrix)
             {
                 return Vector3D.TransformNormal(v, MatrixD.Transpose(worldMatrix));
             }
 
-            public static Vector3D GridDirectionToWorld(Vector3D v, MatrixD worldMatrix)
+            /**
+             * <summary>Converts a direction vector in the local grid to a direction vector in the world grid</summary>
+             * <param name="v">The vector to convert</param>
+             * <param name="worldMatrix">The world matrix to use for the conversion</param>
+             */
+            private static Vector3D GridDirectionToWorld(Vector3D v, MatrixD worldMatrix)
             {
                 return Vector3D.TransformNormal(v, worldMatrix);
             }
 
             private readonly Program program;
 
-            private readonly List<IMyShipController> shipControllers = new List<IMyShipController>();
-            private readonly List<IMyThrust> thrusters = new List<IMyThrust>();
+            private readonly List<IMyShipController> shipControllers = new List<IMyShipController>(); // we keep track of multiple ship controllers in case one breaks
+
+            private readonly ThrusterGroup[] thrusterGroups;
 
             private AutoPilot(Program program)
             {
                 this.program = program;
-                
-                program.GridTerminalSystem.GetBlocksOfType(shipControllers); // get ship controllers
-                program.GridTerminalSystem.GetBlocksOfType(thrusters); // get thrusters
+
+                thrusterGroups = new ThrusterGroup[6] { // one group for each of the 6 directions
+                    new ThrusterGroup(program),
+                    new ThrusterGroup(program),
+                    new ThrusterGroup(program),
+                    new ThrusterGroup(program),
+                    new ThrusterGroup(program),
+                    new ThrusterGroup(program)
+                };
+
+                program.GridTerminalSystem.GetBlocksOfType(null, (IMyTerminalBlock b) =>
+                {
+                    if (b is IMyShipController) // add ship controllers
+                        shipControllers.Add((IMyShipController)b);
+                    else if (b is IMyThrust) // add thrusters to the correct group
+                    {
+                        IMyThrust t = (IMyThrust)b;
+                        Base6Directions.Direction dir = t.Orientation.Forward;
+                        thrusterGroups[(int)dir].AddThruster(t);
+                    }
+
+                    return false;
+                });
             }
 
+            /**
+             * <returns>The (only) instance of this class</returns>
+             */
             public static AutoPilot GetInstance(Program program)
             {
                 if (instance == null)
@@ -58,6 +95,7 @@ namespace IngameScript
 
             /**
              * <summary>Tries to set the thrusters so they drive the ship to the target</summary>
+             * <remarks>Can fail if thrusters are missing or if there are no ship controllers</remarks>
              */
             public void TrySetThrustersToTarget(Vector3D target)
             {
@@ -72,6 +110,7 @@ namespace IngameScript
              * <summary>Calculate the desired force to steer the ship into the direction of the target</summary>
              * <param name="target">The target to steer towards</param>
              * <returns>The needed force (world grid vector).</returns>
+             * <remarks>Returns null if there are no ship controllers; Will try to find new ship controllers</remarks>
              */
             private Vector3D? ComputeTargetForce(Vector3D target)
             {
@@ -89,7 +128,7 @@ namespace IngameScript
 
                 try
                 {
-                    Vector3D v_desired = (target - shipController.GetPosition()) / 2; // half of the distance (don't go too fast)
+                    Vector3D v_desired = (target - shipController.GetPosition()) / 5; // part of the distance (don't go too fast)
                     if (v_desired.LengthSquared() > 10000.0) // if faster than the max speed
                         v_desired = v_desired / v_desired.Length() * 100; // adjust to max speed
 
@@ -109,30 +148,22 @@ namespace IngameScript
              */
             private void SetThrustersToForce(Vector3D targetForce)
             {
-                for (int i = thrusters.Count - 1; i >= 0; i--)
+                for (int i = 0; i < 6; i++)
                 {
-                    try
+                    Vector3D? optThrustDir = thrusterGroups[i].GetThrustDirection();
+                    if (!optThrustDir.HasValue) // if there are no thrusters in this direction we continue
+                        continue;
+                    Vector3D thrustDir = -optThrustDir.Value; // invert the value because we want the direction in which the ship will be pushed
+
+                    double componentOfTargetForce = thrustDir.Dot(targetForce); // the component of the target force that goes in the direction of thrustDir
+                    if (componentOfTargetForce <= 0) // thruster won't help
                     {
-                        if (!thrusters[i].IsWorking) // thruster must work
-                            continue;
-
-                        Vector3D thrustDir = -thrusters[i].WorldMatrix.Forward;
-                        double dotProduct = thrustDir.Dot(targetForce);
-
-                        if (dotProduct <= 0) // thruster won't help
-                        {
-                            thrusters[i].ThrustOverridePercentage = 0f;
-                            continue;
-                        }
-
-                        double thrustAmount = Math.Min(dotProduct, thrusters[i].MaxEffectiveThrust); // what the thruster can do or as much as is required
-                        targetForce -= thrustAmount * thrustDir; // update the target force
-                        thrusters[i].ThrustOverridePercentage = (float)(thrustAmount / thrusters[i].MaxEffectiveThrust); // set the thrust
+                        thrusterGroups[i].SetThrustPercentage(0f); // turn off thrusters
                     }
-                    catch (NullReferenceException)
-                    {
-                        thrusters.RemoveAt(i);
-                    }
+
+                    double totalEffectiveThrust = thrusterGroups[i].GetTotalEffectiveThrust(); // the maximum effective thrust we can exert in this direction
+                    double thrustAmount = Math.Min(componentOfTargetForce, totalEffectiveThrust); // as much as the thrusters can do or as much as is required
+                    thrusterGroups[i].SetThrustPercentage((float)(thrustAmount / totalEffectiveThrust)); // set the thrusters
                 }
             }
         }
