@@ -231,19 +231,19 @@ namespace IngameScript
                 }
             }
         }
-    }
 
-    struct ShipValues
-    {
-        public Vector3D Position;
-        public Vector3D LinearVelocity;
-        public float Mass;
-
-        public ShipValues(Vector3D position, Vector3D linearVelocity, float mass)
+        public struct ShipValues
         {
-            Position = position;
-            LinearVelocity = linearVelocity; 
-            Mass = mass;
+            public Vector3D Position;
+            public Vector3D LinearVelocity;
+            public float Mass;
+
+            public ShipValues(Vector3D position, Vector3D linearVelocity, float mass)
+            {
+                Position = position;
+                LinearVelocity = linearVelocity;
+                Mass = mass;
+            }
         }
     }
 }
