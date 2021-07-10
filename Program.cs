@@ -50,6 +50,19 @@ namespace IngameScript
                 }
             }
 
+            if ((updateSource & UpdateType.Terminal) != 0)
+            {
+                try
+                {
+                    target = Parser.ParseGPS(argument);
+                    Echo("Set target");
+                }
+                catch (FormatException)
+                {
+                    target = null;
+                }
+            }
+
             if ((updateSource & UpdateType.Update10) != 0)
             {
                 if (target.HasValue)
