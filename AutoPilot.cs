@@ -151,12 +151,15 @@ namespace IngameScript
 
             private void CalculateAndSetThrust(ThrusterGroup thrusters, Vector3D distanceToTravel, Vector3D currentVelocity, float mass)
             {
-                Vector3D? thrustDirection = -thrusters.GetThrustDirection(); // negate thrustDirection to get the direction the ship will be pushed in
-                if (!thrustDirection.HasValue) // this means no thrusters in the group
+                ThrusterValues? thrusterValues = thrusters.GetThrusterValues();
+                if (!thrusterValues.HasValue) // this means no thrusters in the group
                     return;
+                
+                Vector3D thrustDirection = -thrusterValues.Value.ThrustDirection;
+                float totalEffectiveThrust = thrusterValues.Value.TotalEffectiveThrust;
 
-                Vector3D componentOfDistanceToTravel = CalculateComponentOfVector(distanceToTravel, thrustDirection.Value);
-                Vector3D componentOfCurrentVelocity = CalculateComponentOfVector(currentVelocity, thrustDirection.Value);
+                Vector3D componentOfDistanceToTravel = CalculateComponentOfVector(distanceToTravel, thrustDirection);
+                Vector3D componentOfCurrentVelocity = CalculateComponentOfVector(currentVelocity, thrustDirection);
             }
 
             /**
@@ -234,9 +237,9 @@ namespace IngameScript
 
         public struct ShipValues
         {
-            public Vector3D Position;
-            public Vector3D LinearVelocity;
-            public float Mass;
+            public Vector3D Position { get; }
+            public Vector3D LinearVelocity { get; }
+            public float Mass { get; }
 
             public ShipValues(Vector3D position, Vector3D linearVelocity, float mass)
             {

@@ -44,47 +44,32 @@ namespace IngameScript
                 thrusters.Add(thruster);
             }
 
-            /**
-             * <returns>The total MaxEffectiveThrust of all thrusters</returns.>
-             */
-            public double GetTotalEffectiveThrust()
+            public ThrusterValues? GetThrusterValues()
             {
-                double total = 0.0;
-                for (int i = thrusters.Count - 1; i >= 0; i--)
-                {
-                    try
-                    {
-                        if (!thrusters[i].IsWorking) // thruster must be working
-                            continue;
-                        total += thrusters[i].MaxEffectiveThrust;
-                    }
-                    catch (NullReferenceException)
-                    {
-                        thrusters.RemoveAt(i);
-                    }
-                }
-                return total;
-            }
+                Vector3D? thrustDirection = null;
+                float totalEffectiveThrust = 0f;
 
-            /**
-             * <returns>The direction in which this group of thrusters thrusts in</returns>
-             * <remarks>Returns null if there are no thrusters in this group. Will remove thrusters that have broken.</remarks>
-             */
-            public Vector3D? GetThrustDirection()
-            {
                 for (int i = thrusters.Count - 1; i >= 0; i--)
                 {
                     try
                     {
-                        return thrusters[i].WorldMatrix.Forward;
+                        if (!thrustDirection.HasValue) // set thrustdirection if still unknown
+                            thrustDirection = thrusters[i].WorldMatrix.Forward;
+
+                        if (!thrusters[i].IsWorking) // only count thrust if the thruster is working
+                            continue;
+                        totalEffectiveThrust += thrusters[i].MaxEffectiveThrust;
                     }
                     catch (NullReferenceException)
                     {
                         thrusters.RemoveAt(i);
                     }
                 }
-                
-                return null;
+
+                if (!thrustDirection.HasValue)
+                    return null;
+
+                return new ThrusterValues(thrustDirection.Value, totalEffectiveThrust);
             }
 
             /**
@@ -105,6 +90,18 @@ namespace IngameScript
                         thrusters.RemoveAt(i);
                     }
                 }
+            }
+        }
+
+        public struct ThrusterValues
+        {
+            public Vector3D ThrustDirection { get; }
+            public float TotalEffectiveThrust { get; }
+
+            public ThrusterValues(Vector3D thrustDirection, float totalEffectiveThrust)
+            {
+                ThrustDirection = thrustDirection;
+                TotalEffectiveThrust = totalEffectiveThrust;
             }
         }
     }
