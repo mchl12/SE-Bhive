@@ -27,6 +27,8 @@ namespace IngameScript
          */
         public class AutoPilot
         {
+            private static readonly double BRAKING_THRESHOLD = 0.9;
+
             private static AutoPilot instance; // singleton pattern because there can only be one instance
 
             /**
@@ -151,6 +153,7 @@ namespace IngameScript
 
             private void CalculateAndSetThrust(ThrusterGroup thrusters, Vector3D distanceToTravel, Vector3D currentVelocity, float mass)
             {
+                // get necessary information
                 ThrusterValues? thrusterValues = thrusters.GetThrusterValues();
                 if (!thrusterValues.HasValue) // this means no thrusters in the group
                     return;
@@ -158,79 +161,40 @@ namespace IngameScript
                 Vector3D thrustDirection = -thrusterValues.Value.ThrustDirection;
                 float totalEffectiveThrust = thrusterValues.Value.TotalEffectiveThrust;
 
-                Vector3D componentOfDistanceToTravel = CalculateComponentOfVector(distanceToTravel, thrustDirection);
-                Vector3D componentOfCurrentVelocity = CalculateComponentOfVector(currentVelocity, thrustDirection);
-            }
+                // calculate inproducts and components of vectors in the direction of thrustDirection
+                double inproductDistanceToTravel = distanceToTravel.Dot(thrustDirection);
+                double inproductCurrentVelocity = currentVelocity.Dot(thrustDirection);
+                
+                Vector3D componentOfDistanceToTravel = inproductDistanceToTravel * thrustDirection;
+                Vector3D componentOfCurrentVelocity = inproductCurrentVelocity * thrustDirection;
 
-            /**
-             * <returns>The component of vector <c>v</c> in <c>direction</c></returns>
-             * <param name="v">The base vector</param>
-             * <param name="direction">The direction in which to get the component</param>
-             */
-            private Vector3D CalculateComponentOfVector(Vector3D v, Vector3D direction)
-            {
-                return v.Dot(direction) * direction;
-            }
+                // calculate needed decelleration
+                double neededDecelleration; // this represents the acceleration (in the opposite direction of currentVelocity) needed to stand still exactly when we arrive
+                if (componentOfDistanceToTravel.IsZero())
+                    neededDecelleration = componentOfCurrentVelocity.Length() * 6.0; // try to stand still in 10 ticks
+                else
+                    neededDecelleration = 2 * componentOfCurrentVelocity.LengthSquared() / componentOfDistanceToTravel.Length(); // a = 2 * v^2 / x (for constant acceleration)
 
-            /**
-             * <summary>Calculate the desired force to steer the ship into the direction of the target</summary>
-             * <param name="target">The target to steer towards</param>
-             * <returns>The needed force (world grid vector).</returns>
-             * <remarks>Returns null if there are no ship controllers; Will try to find new ship controllers</remarks>
-             */
-            private Vector3D? ComputeTargetForce(Vector3D target)
-            {
-                if (shipControllers.Count == 0)
-                {
-                    program.GridTerminalSystem.GetBlocksOfType(shipControllers); // try to find new controllers
-                    if (shipControllers.Count == 0)
+                // set thrust
+                double decellerationForcePercentage = neededDecelleration * mass / totalEffectiveThrust; // the percentage of available effective force needed to decellerate the amount we want
+                if (decellerationForcePercentage > BRAKING_THRESHOLD) // compare percentage of force needed to decellerate with the threshold
+                { // we should start braking
+                    if (inproductCurrentVelocity < 0) // only attempt to break if we thrust opposite to the current velocity
+                        thrusters.SetThrustPercentage((float)Math.Min(decellerationForcePercentage, 1.0)); // limit to 100%
+                    else // either thrusters don't help or do the opposite of what we want
+                        thrusters.SetThrustPercentage(0f);
+                }
+                else
+                { // we can accelerate some more
+                    if (inproductCurrentVelocity > 0) // only attempt if we accelerate in the direction of the current velocity
                     {
-                        program.Echo("ERROR: Autopilot: no ship controllers");
-                        return null;
+                        double desiredSpeed = Math.Min(componentOfDistanceToTravel.Length() / 2.0, 100.0); // accelerate to only half the distance; maximum speed of 100m/s
+                        double desiredAcceleration = desiredSpeed * 6.0; // try to accelerate half of the distance in 10 ticks
+                        double accelerationForcePercentage = desiredAcceleration * mass / totalEffectiveThrust; // percentage of available force
+                        thrusters.SetThrustPercentage((float)Math.Min(accelerationForcePercentage, 1.0)); // limit to 100%
                     }
-                }
-
-                IMyShipController shipController = shipControllers[shipControllers.Count - 1];
-
-                try
-                {
-                    Vector3D v_desired = (target - shipController.GetPosition()); // part of the distance (don't go too fast)
-                    if (v_desired.LengthSquared() > 10000.0) // if faster than the max speed
-                        v_desired = v_desired / v_desired.Length() * 100; // adjust to max speed
-
-                    Vector3D a_desired = v_desired - shipController.GetShipVelocities().LinearVelocity;
-                    Vector3D a_total = a_desired - shipController.GetNaturalGravity(); // subtract gravity to fight it; multiply by 60 so we accelerate this amount in 1 tick
-                    return a_total * shipController.Mass; // F = m*a
-                }
-                catch (NullReferenceException) // catch disappeared ship controller
-                {
-                    shipControllers.RemoveAt(shipControllers.Count - 1); // remove last element
-                    return ComputeTargetForce(target); // try again
-                }
-            }
-
-            /**
-             * <summary>Sets the thrusters so they get as close as possible to the target force</summary>
-             * <param name="force">The desired force of the ship</param>
-             */
-            private void SetThrustersToForce(Vector3D targetForce)
-            {
-                for (int i = 0; i < 6; i++)
-                {
-                    Vector3D? optThrustDir = thrusterGroups[i].GetThrustDirection();
-                    if (!optThrustDir.HasValue) // if there are no thrusters in this direction we continue
-                        continue;
-                    Vector3D thrustDir = -optThrustDir.Value; // invert the value because we want the direction in which the ship will be pushed
-
-                    double componentOfTargetForce = thrustDir.Dot(targetForce); // the component of the target force that goes in the direction of thrustDir
-                    if (componentOfTargetForce <= 0) // thruster won't help
-                    {
-                        thrusterGroups[i].SetThrustPercentage(0f); // turn off thrusters
-                    }
-
-                    double totalEffectiveThrust = thrusterGroups[i].GetTotalEffectiveThrust(); // the maximum effective thrust we can exert in this direction
-                    double thrustAmount = Math.Min(componentOfTargetForce, totalEffectiveThrust); // as much as the thrusters can do or as much as is required
-                    thrusterGroups[i].SetThrustPercentage((float)(thrustAmount / totalEffectiveThrust)); // set the thrusters
+                    else // thrusters don't help or do the opposite of what we want
+                        thrusters.SetThrustPercentage(0f);
                 }
             }
         }
