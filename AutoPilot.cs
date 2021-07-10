@@ -99,11 +99,74 @@ namespace IngameScript
              */
             public void TrySetThrustersToTarget(Vector3D target)
             {
-                Vector3D? desiredForce = ComputeTargetForce(target);
-                if (!desiredForce.HasValue)
+                // get relevant information from the ship controller
+                ShipValues? shipValues = TryGetShipValues();
+                if (!shipValues.HasValue)
                     return;
 
-                SetThrustersToForce(desiredForce.Value);
+                Vector3D position = shipValues.Value.Position;
+                Vector3D currentVelocity = shipValues.Value.LinearVelocity;
+                float mass = shipValues.Value.Mass;
+
+                Vector3D distanceToTravel = target - position;
+
+                for (int i = 0; i < 6; i++)
+                {
+                    CalculateAndSetThrust(thrusterGroups[i], distanceToTravel, currentVelocity, mass);
+                }
+            }
+
+            /**
+             * <returns>Information about the physics of the ship</returns>
+             * <remarks>Returns null if there are no ship controllers; can add and remove elements to and from the ship controller list</remarks>
+             */
+            private ShipValues? TryGetShipValues()
+            {
+                if (shipControllers.Count == 0)
+                {
+                    program.GridTerminalSystem.GetBlocksOfType(shipControllers); // try to find new controllers
+                    if (shipControllers.Count == 0)
+                    {
+                        program.Echo("ERROR: Autopilot: no ship controllers");
+                        return null;
+                    }
+                }
+
+                IMyShipController shipController = shipControllers[shipControllers.Count - 1];
+
+                try
+                {
+                    return new ShipValues(
+                        shipController.GetPosition(),
+                        shipController.GetShipVelocities().LinearVelocity,
+                        shipController.CalculateShipMass().TotalMass
+                    );
+                }
+                catch (NullReferenceException) // catch disappeared ship controller
+                {
+                    shipControllers.RemoveAt(shipControllers.Count - 1); // remove last element
+                    return TryGetShipValues(); // try again
+                }
+            }
+
+            private void CalculateAndSetThrust(ThrusterGroup thrusters, Vector3D distanceToTravel, Vector3D currentVelocity, float mass)
+            {
+                Vector3D? thrustDirection = -thrusters.GetThrustDirection(); // negate thrustDirection to get the direction the ship will be pushed in
+                if (!thrustDirection.HasValue) // this means no thrusters in the group
+                    return;
+
+                Vector3D componentOfDistanceToTravel = CalculateComponentOfVector(distanceToTravel, thrustDirection.Value);
+                Vector3D componentOfCurrentVelocity = CalculateComponentOfVector(currentVelocity, thrustDirection.Value);
+            }
+
+            /**
+             * <returns>The component of vector <c>v</c> in <c>direction</c></returns>
+             * <param name="v">The base vector</param>
+             * <param name="direction">The direction in which to get the component</param>
+             */
+            private Vector3D CalculateComponentOfVector(Vector3D v, Vector3D direction)
+            {
+                return v.Dot(direction) * direction;
             }
 
             /**
@@ -128,12 +191,13 @@ namespace IngameScript
 
                 try
                 {
-                    Vector3D v_desired = (target - shipController.GetPosition()) / 5; // part of the distance (don't go too fast)
+                    Vector3D v_desired = (target - shipController.GetPosition()); // part of the distance (don't go too fast)
                     if (v_desired.LengthSquared() > 10000.0) // if faster than the max speed
                         v_desired = v_desired / v_desired.Length() * 100; // adjust to max speed
 
                     Vector3D a_desired = v_desired - shipController.GetShipVelocities().LinearVelocity;
-                    return a_desired * shipController.Mass * 60; // multiply by game ticks so we accelerate this amount in 1 tick
+                    Vector3D a_total = a_desired - shipController.GetNaturalGravity(); // subtract gravity to fight it; multiply by 60 so we accelerate this amount in 1 tick
+                    return a_total * shipController.Mass; // F = m*a
                 }
                 catch (NullReferenceException) // catch disappeared ship controller
                 {
@@ -166,6 +230,20 @@ namespace IngameScript
                     thrusterGroups[i].SetThrustPercentage((float)(thrustAmount / totalEffectiveThrust)); // set the thrusters
                 }
             }
+        }
+    }
+
+    struct ShipValues
+    {
+        public Vector3D Position;
+        public Vector3D LinearVelocity;
+        public float Mass;
+
+        public ShipValues(Vector3D position, Vector3D linearVelocity, float mass)
+        {
+            Position = position;
+            LinearVelocity = linearVelocity; 
+            Mass = mass;
         }
     }
 }
