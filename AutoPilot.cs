@@ -212,7 +212,7 @@ namespace IngameScript
                     if (desiredVelocity.LengthSquared() > 100.0*100.0) // limit the speed to 100 m/s
                         desiredVelocity = desiredVelocity / desiredVelocity.Length() * 100.0;
                     double inproductDesiredVelocity = desiredVelocity.Dot(thrustDirection);
-                    double inproductDesiredAcceleration = inproductDesiredVelocity - inproductCurrentVelocity - inproductGravity;
+                    double inproductDesiredAcceleration = 6.0 * (inproductDesiredVelocity - inproductCurrentVelocity) - inproductGravity; // * 6.0 to accelerate to that speed within 10 ticks
 
                     Echo($"desiredVelocity: {desiredVelocity}\n" +
                         $"inproductDesiredVelocity: {inproductDesiredVelocity}\n" +
