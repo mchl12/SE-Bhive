@@ -27,6 +27,8 @@ namespace IngameScript
          */
         public class AutoPilot
         {
+            private static Action<string> Echo;
+
             private static readonly double BRAKING_THRESHOLD = 0.9;
 
             private static AutoPilot instance; // singleton pattern because there can only be one instance
@@ -60,6 +62,7 @@ namespace IngameScript
             private AutoPilot(Program program)
             {
                 this.program = program;
+                Echo = program.Echo;
 
                 thrusterGroups = new ThrusterGroup[6] { // one group for each of the 6 directions
                     new ThrusterGroup(program),
@@ -129,7 +132,7 @@ namespace IngameScript
                     program.GridTerminalSystem.GetBlocksOfType(shipControllers); // try to find new controllers
                     if (shipControllers.Count == 0)
                     {
-                        program.Echo("ERROR: Autopilot: no ship controllers");
+                        Echo("ERROR: Autopilot: no ship controllers");
                         return null;
                     }
                 }
@@ -153,6 +156,8 @@ namespace IngameScript
 
             private void CalculateAndSetThrust(ThrusterGroup thrusters, Vector3D distanceToTravel, Vector3D currentVelocity, float mass)
             {
+                Echo("------------------------------------");
+
                 // get necessary information
                 ThrusterValues? thrusterValues = thrusters.GetThrusterValues();
                 if (!thrusterValues.HasValue) // this means no thrusters in the group
@@ -161,37 +166,55 @@ namespace IngameScript
                 Vector3D thrustDirection = -thrusterValues.Value.ThrustDirection;
                 float totalEffectiveThrust = thrusterValues.Value.TotalEffectiveThrust;
 
-                // calculate inproducts and components of vectors in the direction of thrustDirection
+                Echo($"thrustDirection: {thrustDirection}\ntotalEffectiveThrust: {totalEffectiveThrust}\n");
+
+                // calculate inproducts
                 double inproductDistanceToTravel = distanceToTravel.Dot(thrustDirection);
                 double inproductCurrentVelocity = currentVelocity.Dot(thrustDirection);
-                
-                Vector3D componentOfDistanceToTravel = inproductDistanceToTravel * thrustDirection;
-                Vector3D componentOfCurrentVelocity = inproductCurrentVelocity * thrustDirection;
+
+                Echo($"inproductDistanceToTravel: {inproductDistanceToTravel}\ninproductCurrentVelocity: {inproductCurrentVelocity}\n" +
+                        $"distanceToTravel: {distanceToTravel}\ncurrentVelocity: {currentVelocity}\n");
 
                 // calculate needed decelleration
                 double neededDecelleration; // this represents the acceleration (in the opposite direction of currentVelocity) needed to stand still exactly when we arrive
-                if (componentOfDistanceToTravel.IsZero())
-                    neededDecelleration = componentOfCurrentVelocity.Length() * 6.0; // try to stand still in 10 ticks
+                if (inproductDistanceToTravel == 0.0)
+                    neededDecelleration = inproductCurrentVelocity * 6.0; // try to stand still in 10 ticks
                 else
-                    neededDecelleration = 2 * componentOfCurrentVelocity.LengthSquared() / componentOfDistanceToTravel.Length(); // a = 2 * v^2 / x (for constant acceleration)
+                    neededDecelleration = 0.5 * inproductCurrentVelocity * inproductCurrentVelocity / inproductDistanceToTravel; // a = 2 * v^2 / x (for constant acceleration)
+
+                Echo($"neededDecelleration: {neededDecelleration}\n");
 
                 // set thrust
                 double decellerationForcePercentage = neededDecelleration * mass / totalEffectiveThrust; // the percentage of available effective force needed to decellerate the amount we want
+                Echo($"decellerationForcePercentage: {decellerationForcePercentage}\n");
+
                 if (decellerationForcePercentage > BRAKING_THRESHOLD) // compare percentage of force needed to decellerate with the threshold
                 { // we should start braking
                     if (inproductCurrentVelocity < 0) // only attempt to break if we thrust opposite to the current velocity
+                    {
                         thrusters.SetThrustPercentage((float)Math.Min(decellerationForcePercentage, 1.0)); // limit to 100%
+                        Echo($"Braking with {Math.Min(decellerationForcePercentage, 1.0)}\n");
+                    }
                     else // either thrusters don't help or do the opposite of what we want
                         thrusters.SetThrustPercentage(0f);
                 }
                 else
                 { // we can accelerate some more
-                    if (inproductCurrentVelocity > 0) // only attempt if we accelerate in the direction of the current velocity
+                    Vector3D desiredDirection = distanceToTravel - currentVelocity;
+                    double inproductDesiredDirection = desiredDirection.Dot(thrustDirection);
+                    Echo($"inproductDesiredDirection: {inproductDesiredDirection}\n");
+
+                    if (inproductDesiredDirection > 0) // only attempt if we can accelerate in the desired direction
                     {
-                        double desiredSpeed = Math.Min(componentOfDistanceToTravel.Length() / 2.0, 100.0); // accelerate to only half the distance; maximum speed of 100m/s
+                        double desiredSpeed = Math.Min(inproductDesiredDirection / 2.0, 100.0); // accelerate to only half the distance; maximum speed of 100m/s
                         double desiredAcceleration = desiredSpeed * 6.0; // try to accelerate half of the distance in 10 ticks
                         double accelerationForcePercentage = desiredAcceleration * mass / totalEffectiveThrust; // percentage of available force
+
+                        Echo($"desiredSpeed: {desiredSpeed}\ndesiredAcceleration: {desiredAcceleration}\naccelerationForcePercentage: {accelerationForcePercentage}\n");
+
                         thrusters.SetThrustPercentage((float)Math.Min(accelerationForcePercentage, 1.0)); // limit to 100%
+
+                        Echo($"Accelerating with {Math.Min(accelerationForcePercentage, 1.0)}");
                     }
                     else // thrusters don't help or do the opposite of what we want
                         thrusters.SetThrustPercentage(0f);
