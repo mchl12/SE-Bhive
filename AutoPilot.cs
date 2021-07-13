@@ -64,6 +64,7 @@ namespace IngameScript
                 this.program = program;
                 //Echo = program.Echo;
                 Echo = (string text) => { program.Me.CustomData += $"{text}\n"; };
+                //Echo = (string text) => { };
 
                 thrusterGroups = new ThrusterGroup[6] { // one group for each of the 6 directions
                     new ThrusterGroup(program),
@@ -114,13 +115,14 @@ namespace IngameScript
 
                 Vector3D position = shipValues.Value.Position;
                 Vector3D currentVelocity = shipValues.Value.LinearVelocity;
+                Vector3D gravity = shipValues.Value.Gravity;
                 float mass = shipValues.Value.Mass;
 
                 Vector3D distanceToTravel = target - position;
 
                 for (int i = 0; i < 6; i++)
                 {
-                    CalculateAndSetThrust(thrusterGroups[i], distanceToTravel, currentVelocity, mass);
+                    CalculateAndSetThrust(thrusterGroups[i], distanceToTravel, currentVelocity, gravity, mass);
                 }
             }
 
@@ -147,6 +149,7 @@ namespace IngameScript
                     return new ShipValues(
                         shipController.GetPosition(),
                         shipController.GetShipVelocities().LinearVelocity,
+                        shipController.GetNaturalGravity(),
                         shipController.CalculateShipMass().TotalMass
                     );
                 }
@@ -157,7 +160,7 @@ namespace IngameScript
                 }
             }
 
-            private void CalculateAndSetThrust(ThrusterGroup thrusters, Vector3D distanceToTravel, Vector3D currentVelocity, float mass)
+            private void CalculateAndSetThrust(ThrusterGroup thrusters, Vector3D distanceToTravel, Vector3D currentVelocity, Vector3D gravity, float mass)
             {
                 Echo("------------------------------------");
 
@@ -174,16 +177,18 @@ namespace IngameScript
                 // calculate inproducts
                 double inproductDistanceToTravel = distanceToTravel.Dot(thrustDirection);
                 double inproductCurrentVelocity = currentVelocity.Dot(thrustDirection);
+                double inproductGravity = gravity.Dot(thrustDirection);
 
-                Echo($"inproductDistanceToTravel: {inproductDistanceToTravel}\ninproductCurrentVelocity: {inproductCurrentVelocity}\n" +
-                        $"distanceToTravel: {distanceToTravel}\ncurrentVelocity: {currentVelocity}\n");
+                Echo($"inproductDistanceToTravel: {inproductDistanceToTravel}\ninproductCurrentVelocity: {inproductCurrentVelocity}\ninproductGravity: {inproductGravity}\n" +
+                        $"distanceToTravel: {distanceToTravel}\ncurrentVelocity: {currentVelocity}\ngravity: {gravity}\n");
 
                 // calculate needed decelleration
                 double neededDecelleration; // this represents the acceleration (in the opposite direction of currentVelocity) needed to stand still exactly when we arrive
                 if (inproductDistanceToTravel == 0.0)
                     neededDecelleration = inproductCurrentVelocity * 6.0; // try to stand still in 10 ticks
                 else
-                    neededDecelleration = 0.5 * inproductCurrentVelocity * inproductCurrentVelocity / Math.Abs(inproductDistanceToTravel); // a = 2 * v^2 / x (for constant acceleration)
+                    neededDecelleration = 0.5 * inproductCurrentVelocity * inproductCurrentVelocity / Math.Abs(inproductDistanceToTravel) + Math.Sign(inproductCurrentVelocity) * inproductGravity; // a = 0.5 * v^2 / |x| - g (for constant acceleration)
+                                                                                                                                                                    // gravity added or subtracted depending on whether it is with or against the velocity
 
                 Echo($"neededDecelleration: {neededDecelleration}\n");
 
@@ -207,7 +212,7 @@ namespace IngameScript
                     if (desiredVelocity.LengthSquared() > 100.0*100.0) // limit the speed to 100 m/s
                         desiredVelocity = desiredVelocity / desiredVelocity.Length() * 100.0;
                     double inproductDesiredVelocity = desiredVelocity.Dot(thrustDirection);
-                    double inproductDesiredAcceleration = inproductDesiredVelocity - inproductCurrentVelocity;
+                    double inproductDesiredAcceleration = inproductDesiredVelocity - inproductCurrentVelocity - inproductGravity;
 
                     Echo($"desiredVelocity: {desiredVelocity}\n" +
                         $"inproductDesiredVelocity: {inproductDesiredVelocity}\n" +
@@ -215,10 +220,9 @@ namespace IngameScript
 
                     if (inproductDesiredAcceleration > 0) // only attempt if we can accelerate in the desired direction
                     {
-                        double desiredAcceleration = inproductDesiredAcceleration * 6.0; // try to accelerate in 10 ticks instead of 1 second
-                        double accelerationForcePercentage = desiredAcceleration * mass / totalEffectiveThrust; // percentage of available force
+                        double accelerationForcePercentage = inproductDesiredAcceleration * mass / totalEffectiveThrust; // percentage of available force
 
-                        Echo($"desiredAcceleration: {desiredAcceleration}\naccelerationForcePercentage: {accelerationForcePercentage}\n");
+                        Echo($"accelerationForcePercentage: {accelerationForcePercentage}\n");
 
                         thrusters.SetThrustPercentage((float)Math.Min(accelerationForcePercentage, 1.0)); // limit to 100%
 
@@ -234,12 +238,14 @@ namespace IngameScript
         {
             public Vector3D Position { get; }
             public Vector3D LinearVelocity { get; }
+            public Vector3D Gravity { get; }
             public float Mass { get; }
 
-            public ShipValues(Vector3D position, Vector3D linearVelocity, float mass)
+            public ShipValues(Vector3D position, Vector3D linearVelocity, Vector3D gravity, float mass)
             {
                 Position = position;
                 LinearVelocity = linearVelocity;
+                Gravity = gravity;
                 Mass = mass;
             }
         }
