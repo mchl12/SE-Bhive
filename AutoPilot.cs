@@ -62,7 +62,8 @@ namespace IngameScript
             private AutoPilot(Program program)
             {
                 this.program = program;
-                Echo = program.Echo;
+                //Echo = program.Echo;
+                Echo = (string text) => { program.Me.CustomData += $"{text}\n"; };
 
                 thrusterGroups = new ThrusterGroup[6] { // one group for each of the 6 directions
                     new ThrusterGroup(program),
@@ -104,6 +105,8 @@ namespace IngameScript
              */
             public void TrySetThrustersToTarget(Vector3D target)
             {
+                program.Me.CustomData = "";
+
                 // get relevant information from the ship controller
                 ShipValues? shipValues = TryGetShipValues();
                 if (!shipValues.HasValue)
@@ -180,7 +183,7 @@ namespace IngameScript
                 if (inproductDistanceToTravel == 0.0)
                     neededDecelleration = inproductCurrentVelocity * 6.0; // try to stand still in 10 ticks
                 else
-                    neededDecelleration = 0.5 * inproductCurrentVelocity * inproductCurrentVelocity / inproductDistanceToTravel; // a = 2 * v^2 / x (for constant acceleration)
+                    neededDecelleration = 0.5 * inproductCurrentVelocity * inproductCurrentVelocity / Math.Abs(inproductDistanceToTravel); // a = 2 * v^2 / x (for constant acceleration)
 
                 Echo($"neededDecelleration: {neededDecelleration}\n");
 
@@ -200,17 +203,22 @@ namespace IngameScript
                 }
                 else
                 { // we can accelerate some more
-                    Vector3D desiredDirection = distanceToTravel - currentVelocity;
-                    double inproductDesiredDirection = desiredDirection.Dot(thrustDirection);
-                    Echo($"inproductDesiredDirection: {inproductDesiredDirection}\n");
+                    Vector3D desiredVelocity = distanceToTravel;
+                    if (desiredVelocity.LengthSquared() > 100.0*100.0) // limit the speed to 100 m/s
+                        desiredVelocity = desiredVelocity / desiredVelocity.Length() * 100.0;
+                    double inproductDesiredVelocity = desiredVelocity.Dot(thrustDirection);
+                    double inproductDesiredAcceleration = inproductDesiredVelocity - inproductCurrentVelocity;
 
-                    if (inproductDesiredDirection > 0) // only attempt if we can accelerate in the desired direction
+                    Echo($"desiredVelocity: {desiredVelocity}\n" +
+                        $"inproductDesiredVelocity: {inproductDesiredVelocity}\n" +
+                        $"inproductDesiredAcceleration: {inproductDesiredAcceleration}\n");
+
+                    if (inproductDesiredAcceleration > 0) // only attempt if we can accelerate in the desired direction
                     {
-                        double desiredSpeed = Math.Min(inproductDesiredDirection / 2.0, 100.0); // accelerate to only half the distance; maximum speed of 100m/s
-                        double desiredAcceleration = desiredSpeed * 6.0; // try to accelerate half of the distance in 10 ticks
+                        double desiredAcceleration = inproductDesiredAcceleration * 6.0; // try to accelerate in 10 ticks instead of 1 second
                         double accelerationForcePercentage = desiredAcceleration * mass / totalEffectiveThrust; // percentage of available force
 
-                        Echo($"desiredSpeed: {desiredSpeed}\ndesiredAcceleration: {desiredAcceleration}\naccelerationForcePercentage: {accelerationForcePercentage}\n");
+                        Echo($"desiredAcceleration: {desiredAcceleration}\naccelerationForcePercentage: {accelerationForcePercentage}\n");
 
                         thrusters.SetThrustPercentage((float)Math.Min(accelerationForcePercentage, 1.0)); // limit to 100%
 
