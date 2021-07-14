@@ -38,7 +38,7 @@ namespace IngameScript
 
             private readonly Program program;
             private readonly List<IMyCameraBlock> cameras = new List<IMyCameraBlock>();
-            private readonly Dictionary<long, MyDetectedEntityInfo> detectedEntities = new Dictionary<long, MyDetectedEntityInfo>();
+            private readonly Dictionary<long, DetectedEntity> detectedEntities = new Dictionary<long, DetectedEntity>();
 
             private Radar(Program program)
             {
@@ -86,7 +86,7 @@ namespace IngameScript
                     if (entity.IsEmpty())
                         return null; // nothing found
 
-                    detectedEntities[entity.EntityId] = entity; // add or update the entity in the dictionary
+                    detectedEntities[entity.EntityId] = new DetectedEntity(entity); // add or update the entity in the dictionary
 
                     return entity;
                 }
@@ -111,6 +111,67 @@ namespace IngameScript
                     {
                         cameras.RemoveAt(i);
                     }
+                }
+            }
+
+            struct DetectedEntity
+            {
+                public BoundingBoxD BoundingBox { get; }
+                public long EntityId { get; }
+                public Vector3D HitPosition { get; }
+                public string Name { get; }
+                public MatrixD Orientation { get; }
+                public Vector3D Position { get; }
+                public MyRelationsBetweenPlayerAndBlock Relationship { get; }
+                public long TimeStamp { get; }
+                public MyDetectedEntityType Type { get; }
+                public Vector3 Velocity { get; }
+
+                public DetectedEntity(MyDetectedEntityInfo info)
+                {
+                    BoundingBox = info.BoundingBox;
+                    EntityId = info.EntityId;
+                    HitPosition = info.HitPosition.Value;
+                    Name = info.Name;
+                    Orientation = info.Orientation;
+                    Position = info.Position;
+                    Relationship = info.Relationship;
+                    TimeStamp = info.TimeStamp;
+                    Type = info.Type;
+                    Velocity = info.Velocity;
+                }
+
+                public DetectedEntity(MyTuple<BoundingBoxD, long, Vector3D, string, MatrixD, MyTuple<Vector3D, uint, long, uint, Vector3>> info)
+                {
+                    BoundingBox = info.Item1;
+                    EntityId = info.Item2;
+                    HitPosition = info.Item3;
+                    Name = info.Item4;
+                    Orientation = info.Item5;
+                    Position = info.Item6.Item1;
+                    Relationship = (MyRelationsBetweenPlayerAndBlock)info.Item6.Item2;
+                    TimeStamp = info.Item6.Item3;
+                    Type = (MyDetectedEntityType)info.Item6.Item4;
+                    Velocity = info.Item6.Item5;
+                }
+
+                public MyTuple<BoundingBoxD, long, Vector3D, string, MatrixD, MyTuple<Vector3D, uint, long, uint, Vector3>>
+                    AsIGCCompatible()
+                {
+                    return new MyTuple<BoundingBoxD, long, Vector3D, string, MatrixD, MyTuple<Vector3D, uint, long, uint, Vector3>>(
+                        BoundingBox,
+                        EntityId,
+                        HitPosition,
+                        Name,
+                        Orientation,
+                        new MyTuple<Vector3D, uint, long, uint, Vector3>(
+                            Position,
+                            (uint)Relationship,
+                            TimeStamp,
+                            (uint)Type,
+                            Velocity
+                        )
+                    );
                 }
             }
         }
