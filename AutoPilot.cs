@@ -58,12 +58,15 @@ namespace IngameScript
             private readonly List<IMyShipController> shipControllers = new List<IMyShipController>(); // we keep track of multiple ship controllers in case one breaks
 
             private readonly ThrusterGroup[] thrusterGroups;
+            private readonly Radar radar;
 
             private AutoPilot(Program program)
             {
                 this.program = program;
-                //Echo = program.Echo;
-                Echo = (string text) => { program.Me.CustomData += $"{text}\n"; };
+                radar = Radar.GetInstance(program);
+
+                Echo = program.Echo;
+                //Echo = (string text) => { program.Me.CustomData += $"{text}\n"; };
                 //Echo = (string text) => { };
 
                 thrusterGroups = new ThrusterGroup[6] { // one group for each of the 6 directions

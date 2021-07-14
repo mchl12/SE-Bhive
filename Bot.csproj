@@ -50,6 +50,7 @@
     <Compile Include="Program.cs" />
     <AdditionalFiles Include="thumb.png" />
     <AdditionalFiles Include="MDK\whitelist.cache" />
+    <Compile Include="Radar.cs" />
     <Compile Include="ThrusterGroup.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
