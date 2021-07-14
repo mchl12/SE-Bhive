@@ -232,21 +232,21 @@ namespace IngameScript
                         thrusters.SetThrustPercentage(0f);
                 }
             }
-        }
 
-        public struct ShipValues
-        {
-            public Vector3D Position { get; }
-            public Vector3D LinearVelocity { get; }
-            public Vector3D Gravity { get; }
-            public float Mass { get; }
-
-            public ShipValues(Vector3D position, Vector3D linearVelocity, Vector3D gravity, float mass)
+            public struct ShipValues
             {
-                Position = position;
-                LinearVelocity = linearVelocity;
-                Gravity = gravity;
-                Mass = mass;
+                public Vector3D Position { get; }
+                public Vector3D LinearVelocity { get; }
+                public Vector3D Gravity { get; }
+                public float Mass { get; }
+
+                public ShipValues(Vector3D position, Vector3D linearVelocity, Vector3D gravity, float mass)
+                {
+                    Position = position;
+                    LinearVelocity = linearVelocity;
+                    Gravity = gravity;
+                    Mass = mass;
+                }
             }
         }
     }
