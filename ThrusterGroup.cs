@@ -91,17 +91,17 @@ namespace IngameScript
                     }
                 }
             }
+        }
+        
+        public struct ThrusterValues
+        {
+            public Vector3D ThrustDirection { get; }
+            public float TotalEffectiveThrust { get; }
 
-            public struct ThrusterValues
+            public ThrusterValues(Vector3D thrustDirection, float totalEffectiveThrust)
             {
-                public Vector3D ThrustDirection { get; }
-                public float TotalEffectiveThrust { get; }
-
-                public ThrusterValues(Vector3D thrustDirection, float totalEffectiveThrust)
-                {
-                    ThrustDirection = thrustDirection;
-                    TotalEffectiveThrust = totalEffectiveThrust;
-                }
+                ThrustDirection = thrustDirection;
+                TotalEffectiveThrust = totalEffectiveThrust;
             }
         }
     }

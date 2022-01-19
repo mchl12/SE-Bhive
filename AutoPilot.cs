@@ -29,7 +29,7 @@ namespace IngameScript
         {
             private static Action<string> Echo;
 
-            private static readonly double BRAKING_THRESHOLD = 0.9;
+            private static readonly double BRAKING_THRESHOLD = 0.8;
 
             private static AutoPilot instance; // singleton pattern because there can only be one instance
 
@@ -65,9 +65,9 @@ namespace IngameScript
                 this.program = program;
                 radar = Radar.GetInstance(program);
 
-                Echo = program.Echo;
+                //Echo = program.Echo;
                 //Echo = (string text) => { program.Me.CustomData += $"{text}\n"; };
-                //Echo = (string text) => { };
+                Echo = (string text) => { };
 
                 thrusterGroups = new ThrusterGroup[6] { // one group for each of the 6 directions
                     new ThrusterGroup(program),
@@ -163,6 +163,11 @@ namespace IngameScript
                 }
             }
 
+            private void Err<T>(String name, T obj)
+            {
+                Echo($"{name} = {obj}");
+            }
+
             private void CalculateAndSetThrust(ThrusterGroup thrusters, Vector3D distanceToTravel, Vector3D currentVelocity, Vector3D gravity, float mass)
             {
                 // get necessary information
@@ -187,7 +192,14 @@ namespace IngameScript
                                                                                                                                                                     // gravity added or subtracted depending on whether it is with or against the velocity
                 // set thrust
                 double decellerationForcePercentage = neededDecelleration * mass / totalEffectiveThrust; // the percentage of available effective force needed to decellerate the amount we want
-                
+
+                Echo("---------------------------------------");
+                Err("inproductDistanceToTravel", inproductDistanceToTravel);
+                Err("inproductCurrentVelocity", inproductCurrentVelocity);
+                Err("inproductGravity", inproductGravity);
+                Err("neededDecelleration", neededDecelleration);
+                Err("decellerationForcePercentage", decellerationForcePercentage);
+
                 if (decellerationForcePercentage > BRAKING_THRESHOLD) // compare percentage of force needed to decellerate with the threshold
                 { // we should start braking
                     if (inproductCurrentVelocity < 0) // only attempt to break if we thrust opposite to the current velocity
@@ -204,6 +216,9 @@ namespace IngameScript
                         desiredVelocity = desiredVelocity / desiredVelocity.Length() * 100.0;
                     double inproductDesiredVelocity = desiredVelocity.Dot(thrustDirection);
                     double inproductDesiredAcceleration = 6.0 * (inproductDesiredVelocity - inproductCurrentVelocity) - inproductGravity; // * 6.0 to accelerate to that speed within 10 ticks
+
+                    Err("inproductDesiredVelocity", inproductDesiredVelocity);
+                    Err("inproductDesiredAcceleration", inproductDesiredAcceleration);
 
                     if (inproductDesiredAcceleration > 0) // only attempt if we can accelerate in the desired direction
                     {
