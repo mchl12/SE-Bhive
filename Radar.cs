@@ -114,6 +114,9 @@ namespace IngameScript
                 }
             }
 
+            /**
+             * <summary>Used as a wrapper for MyDetectedEntityInfo to provide methods for IGC compatibility</summary>
+             */
             struct DetectedEntity
             {
                 public BoundingBoxD BoundingBox { get; }
