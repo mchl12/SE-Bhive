@@ -58,12 +58,15 @@ namespace IngameScript
             private readonly List<IMyShipController> shipControllers = new List<IMyShipController>(); // we keep track of multiple ship controllers in case one breaks
 
             private readonly ThrusterGroup[] thrusterGroups;
+            private readonly Radar radar;
 
             private AutoPilot(Program program)
             {
                 this.program = program;
-                //Echo = program.Echo;
-                Echo = (string text) => { program.Me.CustomData += $"{text}\n"; };
+                radar = Radar.GetInstance(program);
+
+                Echo = program.Echo;
+                //Echo = (string text) => { program.Me.CustomData += $"{text}\n"; };
                 //Echo = (string text) => { };
 
                 thrusterGroups = new ThrusterGroup[6] { // one group for each of the 6 directions
@@ -162,8 +165,6 @@ namespace IngameScript
 
             private void CalculateAndSetThrust(ThrusterGroup thrusters, Vector3D distanceToTravel, Vector3D currentVelocity, Vector3D gravity, float mass)
             {
-                Echo("------------------------------------");
-
                 // get necessary information
                 ThrusterValues? thrusterValues = thrusters.GetThrusterValues();
                 if (!thrusterValues.HasValue) // this means no thrusters in the group
@@ -172,15 +173,10 @@ namespace IngameScript
                 Vector3D thrustDirection = -thrusterValues.Value.ThrustDirection;
                 float totalEffectiveThrust = thrusterValues.Value.TotalEffectiveThrust;
 
-                Echo($"thrustDirection: {thrustDirection}\ntotalEffectiveThrust: {totalEffectiveThrust}\n");
-
                 // calculate inproducts
                 double inproductDistanceToTravel = distanceToTravel.Dot(thrustDirection);
                 double inproductCurrentVelocity = currentVelocity.Dot(thrustDirection);
                 double inproductGravity = gravity.Dot(thrustDirection);
-
-                Echo($"inproductDistanceToTravel: {inproductDistanceToTravel}\ninproductCurrentVelocity: {inproductCurrentVelocity}\ninproductGravity: {inproductGravity}\n" +
-                        $"distanceToTravel: {distanceToTravel}\ncurrentVelocity: {currentVelocity}\ngravity: {gravity}\n");
 
                 // calculate needed decelleration
                 double neededDecelleration; // this represents the acceleration (in the opposite direction of currentVelocity) needed to stand still exactly when we arrive
@@ -189,19 +185,14 @@ namespace IngameScript
                 else
                     neededDecelleration = 0.5 * inproductCurrentVelocity * inproductCurrentVelocity / Math.Abs(inproductDistanceToTravel) + Math.Sign(inproductCurrentVelocity) * inproductGravity; // a = 0.5 * v^2 / |x| - g (for constant acceleration)
                                                                                                                                                                     // gravity added or subtracted depending on whether it is with or against the velocity
-
-                Echo($"neededDecelleration: {neededDecelleration}\n");
-
                 // set thrust
                 double decellerationForcePercentage = neededDecelleration * mass / totalEffectiveThrust; // the percentage of available effective force needed to decellerate the amount we want
-                Echo($"decellerationForcePercentage: {decellerationForcePercentage}\n");
-
+                
                 if (decellerationForcePercentage > BRAKING_THRESHOLD) // compare percentage of force needed to decellerate with the threshold
                 { // we should start braking
                     if (inproductCurrentVelocity < 0) // only attempt to break if we thrust opposite to the current velocity
                     {
                         thrusters.SetThrustPercentage((float)Math.Min(decellerationForcePercentage, 1.0)); // limit to 100%
-                        Echo($"Braking with {Math.Min(decellerationForcePercentage, 1.0)}\n");
                     }
                     else // either thrusters don't help or do the opposite of what we want
                         thrusters.SetThrustPercentage(0f);
@@ -214,19 +205,10 @@ namespace IngameScript
                     double inproductDesiredVelocity = desiredVelocity.Dot(thrustDirection);
                     double inproductDesiredAcceleration = 6.0 * (inproductDesiredVelocity - inproductCurrentVelocity) - inproductGravity; // * 6.0 to accelerate to that speed within 10 ticks
 
-                    Echo($"desiredVelocity: {desiredVelocity}\n" +
-                        $"inproductDesiredVelocity: {inproductDesiredVelocity}\n" +
-                        $"inproductDesiredAcceleration: {inproductDesiredAcceleration}\n");
-
                     if (inproductDesiredAcceleration > 0) // only attempt if we can accelerate in the desired direction
                     {
                         double accelerationForcePercentage = inproductDesiredAcceleration * mass / totalEffectiveThrust; // percentage of available force
-
-                        Echo($"accelerationForcePercentage: {accelerationForcePercentage}\n");
-
                         thrusters.SetThrustPercentage((float)Math.Min(accelerationForcePercentage, 1.0)); // limit to 100%
-
-                        Echo($"Accelerating with {Math.Min(accelerationForcePercentage, 1.0)}");
                     }
                     else // thrusters don't help or do the opposite of what we want
                         thrusters.SetThrustPercentage(0f);
